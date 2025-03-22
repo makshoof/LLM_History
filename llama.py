@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq  
+import re  # Import regex for better name extraction
 
 # Load API key from environment variables
 load_dotenv()
@@ -11,9 +12,9 @@ API_KEY = os.getenv("GROQ_API_KEY")
 
 # Initialize session state for chat memory
 if "messages" not in st.session_state:
-    st.session_state.messages = []  # Stores full chat history
+    st.session_state.messages = []
 if "user_name" not in st.session_state:
-    st.session_state.user_name = None  # Stores the user's name
+    st.session_state.user_name = None
 
 # Define prompt template
 prompt_template = """System: You are a helpful assistant.
@@ -23,6 +24,11 @@ prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful assistant."),
     ("user", "Question: {question}")
 ])
+
+def extract_name(user_input):
+    """Extract only the first name after 'my name is'."""
+    match = re.search(r"my name is (\w+)", user_input, re.IGNORECASE)
+    return match.group(1) if match else None
 
 def generate_response(question, api_key, engine, temperature, max_tokens):
     """Generate response from Groq API."""
@@ -65,6 +71,10 @@ if st.sidebar.button("🗑️ Clear Chat History"):
     st.session_state.user_name = None
     st.success("Chat history cleared!")
 
+# Sidebar: Show query sent to LLM
+st.sidebar.markdown("### 📤 Query Sent to LLM:")
+st.sidebar.text_area("Prompt Template", prompt_template, height=100)
+
 # Display chat messages
 st.write("💬 **Chat with me!**")
 
@@ -87,8 +97,12 @@ if user_input:
 
     # Check if user is introducing their name
     if "my name is" in user_input.lower():
-        st.session_state.user_name = user_input.split("my name is")[-1].strip().capitalize()
-        response = f"Hello {st.session_state.user_name}, nice to meet you! 😊"
+        extracted_name = extract_name(user_input)
+        if extracted_name:
+            st.session_state.user_name = extracted_name.capitalize()
+            response = f"Hello {st.session_state.user_name}, nice to meet you! 😊"
+        else:
+            response = "I couldn't catch your name properly. Can you say it again?"
     elif "what's my name" in user_input.lower():
         response = f"Your name is {st.session_state.user_name}!" if st.session_state.user_name else "I don't remember your name yet. Tell me again! 🤔"
     else:
